@@ -52,6 +52,7 @@ function woo_theme_design_setup() {
 			'menu-1' => esc_html__( 'Primary', 'woo-theme-design' ),
 		)
 	);
+	
 
 	/*
 		* Switch default core markup for search form, comment form, and comments
@@ -139,9 +140,24 @@ add_action( 'widgets_init', 'woo_theme_design_widgets_init' );
  */
 function woo_theme_design_scripts() {
 	wp_enqueue_style( 'woo-theme-design-style', get_stylesheet_uri(), array(), _S_VERSION );
+	//wp_enqueue_style( 'woo-theme-design-font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css', array(), '5.15.3' );
+	wp_enqueue_style( 'woo-theme-design-bootstrap', get_template_directory_uri() .'/assets/css/bootstrap.min.css', array(), '5.0.0' );
+	wp_enqueue_style( 'woo-theme-design-LineIcons', get_template_directory_uri() .'/assets/css/LineIcons.3.0.css', array(), '3.0' );
+	wp_enqueue_style( 'woo-theme-design-tiny-slider', get_template_directory_uri() .'/assets/css/tiny-slider.css', array(), '3.0' );
+	wp_enqueue_style( 'woo-theme-design-glightbox', get_template_directory_uri() .'/assets/css/glightbox.min.css', array(), '3.0' );
+	wp_enqueue_style( 'woo-theme-design-main', get_template_directory_uri() .'/assets/css/main.css', array(), '1.0' );
+	//wp_enqueue_style( 'woo-theme-design-tiny-slider', 'https://cdnjs.cloudflare.com/ajax/libs/tiny-slider/2.9.4/tiny-slider.css', array(), '2.9.4' );
+	wp_enqueue_style( 'woo-theme-design-style', get_template_directory_uri() . '/style.css', array(), _S_VERSION );
 	wp_style_add_data( 'woo-theme-design-style', 'rtl', 'replace' );
 
+	wp_enqueue_script( 'woo-theme-design-skip-link-focus-fix', get_template_directory_uri() . '/js/skip-link-focus-fix.js', array(), _S_VERSION, true );
+
 	wp_enqueue_script( 'woo-theme-design-navigation', get_template_directory_uri() . '/js/navigation.js', array(), _S_VERSION, true );
+	wp_enqueue_script( 'woo-theme-design-bootstrap-js', get_template_directory_uri() . '/assets/js/bootstrap.min.js', array(), _S_VERSION, true );
+	wp_enqueue_script( 'woo-theme-design-tiny-slider', get_template_directory_uri() . '/assets/js/tiny-slider.js', array(), _S_VERSION, true );
+	wp_enqueue_script( 'woo-theme-design-glightbox', get_template_directory_uri() . '/assets/js/glightbox.min.js', array(), _S_VERSION, true );
+	wp_enqueue_script( 'woo-theme-design-main', get_template_directory_uri() . '/assets/js/main.js', array(), _S_VERSION, true );
+
 
 	if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) {
 		wp_enqueue_script( 'comment-reply' );
@@ -182,3 +198,125 @@ if ( defined( 'JETPACK__VERSION' ) ) {
 if ( class_exists( 'WooCommerce' ) ) {
 	require get_template_directory() . '/inc/woocommerce.php';
 }
+
+
+// Add custom menu walker
+class Bootstrap_Nav_Walker extends Walker_Nav_Menu {
+    // Start Level
+    function start_lvl( &$output, $depth = 0, $args = null ) {
+        $indent = str_repeat("\t", $depth);
+        $output .= "\n$indent<ul class=\"sub-menu collapse\">\n";
+    }
+
+    // Start Element
+    function start_el( &$output, $item, $depth = 0, $args = null, $id = 0 ) {
+        $indent = ( $depth ) ? str_repeat("\t", $depth) : '';
+
+        $classes = empty( $item->classes ) ? array() : (array) $item->classes;
+        $classes[] = 'nav-item'; // Add Bootstrap's nav-item class
+
+        // Check if this menu item has children
+        $has_children = !empty($args->has_children) && $args->has_children;
+
+        if ($has_children) {
+            $classes[] = 'dropdown'; // Add dropdown class for parent items
+        }
+
+        // Check if this menu item is the current page
+        if (in_array('current-menu-item', $classes) || in_array('current-menu-ancestor', $classes) || in_array('current-page-parent', $classes) || in_array('current-page-ancestor', $classes)) {
+            $classes[] = 'active';
+        }
+
+        $class_names = join(' ', apply_filters('nav_menu_css_class', array_filter($classes), $item, $args));
+        $class_names = ' class="' . esc_attr($class_names) . '"';
+
+        $id = apply_filters('nav_menu_item_id', 'menu-item-'. $item->ID, $item, $args);
+        $id = $id ? ' id="' . esc_attr($id) . '"' : '';
+
+        $output .= $indent . '<li' . $id . $class_names .'>';
+
+        $atts = array();
+        $atts['title']  = ! empty( $item->attr_title ) ? $item->attr_title : '';
+        $atts['target'] = ! empty( $item->target )     ? $item->target     : '';
+        $atts['rel']    = ! empty( $item->xfn )        ? $item->xfn        : '';
+
+        // Add Bootstrap classes for links
+        if ($has_children) {
+            $atts['href'] = '#'; // Prevent link navigation
+            $atts['data-bs-toggle'] = 'collapse';
+            $atts['data-bs-target'] = '#submenu-' . $item->ID;
+            $atts['aria-controls'] = 'submenu-' . $item->ID;
+            $atts['aria-expanded'] = 'false';
+            $atts['class'] = 'dd-menu collapsed nav-link'; // Add classes for parent items with submenus
+        } else {
+            $atts['href'] = ! empty( $item->url ) ? $item->url : '';
+            $atts['class'] = 'nav-link'; // Class for regular menu items
+
+            // Add 'active' class to the <a> tag if the menu item is the current page
+            if (in_array('active', $classes)) {
+                $atts['class'] .= ' active';
+            }
+        }
+
+        $atts = apply_filters('nav_menu_link_attributes', $atts, $item, $args);
+
+        $attributes = '';
+        foreach ( $atts as $attr => $value ) {
+            if ( ! empty( $value ) ) {
+                $value = ( 'href' === $attr ) ? esc_url( $value ) : esc_attr( $value );
+                $attributes .= ' ' . $attr . '="' . $value . '"';
+            }
+        }
+
+        $title = apply_filters('the_title', $item->title, $item->ID);
+
+        $item_output = $args->before;
+        $item_output .= '<a'. $attributes .'>';
+        $item_output .= $args->link_before . $title . $args->link_after;
+        $item_output .= '</a>';
+        $item_output .= $args->after;
+
+        $output .= apply_filters('walker_nav_menu_start_el', $item_output, $item, $depth, $args);
+    }
+
+    // End Element
+    function end_el( &$output, $item, $depth = 0, $args = null ) {
+        $output .= "</li>\n";
+    }
+
+    // End Level
+    function end_lvl( &$output, $depth = 0, $args = null ) {
+        $indent = str_repeat("\t", $depth);
+        $output .= "$indent</ul>\n";
+    }
+}
+
+
+//
+
+function my_woocommerce_cart_count() {
+    $count = WC()->cart->get_cart_contents_count();
+    return $count;
+}
+
+//
+function add_to_wishlist($product_id) {
+    // Retrieve the existing wishlist items
+    $wishlist_items = isset($_COOKIE['woo_webapp_wishlist']) ? unserialize($_COOKIE['my_custom_wishlist']) : array();
+
+    // Add the new item to the array if it's not already there
+    if (!in_array($product_id, $wishlist_items)) {
+        $wishlist_items[] = $product_id;
+    }
+
+    // Store the updated wishlist back in the cookie
+    setcookie('woo_webapp_wishlist', serialize($wishlist_items), time() + (86400 * 30), "/"); // 30 days
+}
+
+function my_custom_wishlist_count() {
+    // Retrieve the wishlist items stored in a cookie or session
+    $wishlist_items = isset($_COOKIE['my_custom_wishlist']) ? unserialize($_COOKIE['my_custom_wishlist']) : array();
+    return count($wishlist_items);
+}
+
+
